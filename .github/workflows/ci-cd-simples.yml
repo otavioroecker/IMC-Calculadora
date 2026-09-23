@@ -1,0 +1,57 @@
+name: CI/CD
+
+# Quando esse workflow roda:
+# - "pull_request" -> toda vez que você abrir um PR para a main (só testa)
+# - "push" na main -> testa E, se passar, cria uma release (CD)
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # necessário para o job "release" criar a tag/release
+
+jobs:
+  # ---------- PARTE 1: CI (Integração Contínua) ----------
+  testes:
+    name: Rodar testes
+    runs-on: ubuntu-latest
+    steps:
+      # baixa o código do repositório dentro da máquina do GitHub Actions
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      # instala o Python na máquina do GitHub Actions
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # instala as dependências do projeto (as mesmas do requirements.txt)
+      - name: Instalar dependências
+        run: pip install -r requirements.txt pytest
+
+      # roda a suíte de testes que já existe em tests/
+      - name: Rodar pytest
+        run: pytest tests/ -v
+
+  # ---------- PARTE 2: CD (Entrega Contínua) ----------
+  release:
+    name: Criar release automática
+    needs: testes                # só roda se o job "testes" passar
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      # cria uma tag com o número do commit e publica uma "release" no GitHub
+      # (aba "Releases" do repositório), como registro de que essa versão
+      # passou nos testes e está pronta para uso.
+      - name: Criar tag e release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          generate_release_notes: true
+          name: "Versão ${{ github.run_number }}"
