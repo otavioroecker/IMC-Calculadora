@@ -104,7 +104,7 @@ jobs:
           docker push "$NEW"
 
       - name: Baseline - tag e release (notas automáticas)
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.ver.outputs.version }}
           name: v${{ steps.ver.outputs.version }}
