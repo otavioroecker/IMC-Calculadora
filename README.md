@@ -9,10 +9,10 @@ imc-calculadora-python/
 │   └── workflows/
 │       └── ci-cd-simples.yml
 ├── app/
-│   ├── main.py       # Ponto de entrada (equivalente a Program.cs)
-│   ├── routes.py      # Rotas (equivalente a ImcController.cs)
-│   ├── services.py    # Lógica de cálculo (equivalente a ImcService.cs)
-│   └── models.py      # Modelos Pydantic (equivalente a ImcRequest/ImcResponse)
+│   ├── main.py       
+│   ├── routes.py      
+│   ├── services.py    
+│   └── models.py      
 ├── tests/
-│   └── test_imc_service.py  # Testes (equivalente a ImcServiceTests.cs)
+│   └── test_imc_service.py  
 └── requirements.txt
