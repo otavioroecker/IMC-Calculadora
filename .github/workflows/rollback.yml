@@ -1,0 +1,34 @@
+name: Rollback
+
+# Reimplanta uma versão anterior (tag SemVer já publicada no ghcr.io).
+# Também passa pelo gate do environment "production" (aprovação manual).
+on:
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versão a restaurar, ex.: 1.0.3"
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  rollback:
+    name: Rollback em Production
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Subir a versão anterior
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          docker run -d --name api -p 8000:8000 ghcr.io/${OWNER}/imc-calculadora:${{ inputs.versao }}
+      - name: Smoke tests
+        run: sh scripts/smoke_test.sh http://localhost:8000

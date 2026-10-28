@@ -1,0 +1,111 @@
+name: CD
+
+# Disparado após o merge (push na main).
+# build -> staging (automático) -> production (PAUSA até o revisor aprovar)
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    name: Build e publicação da imagem
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir nome da imagem (minúsculo)
+        id: meta
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=${REGISTRY}/${OWNER}/imc-calculadora:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+
+  staging:
+    name: Deploy em Staging
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Subir a MESMA imagem publicada (sem recompilar)
+        run: docker run -d --name api -p 8000:8000 ${{ needs.build.outputs.image }}
+      - name: Testes de aceitação em staging
+        run: sh scripts/acceptance_test.sh http://localhost:8000
+
+  production:
+    name: Deploy em Production
+    needs: [build, staging]
+    runs-on: ubuntu-latest
+    # O environment "production" exige aprovação do revisor obrigatório:
+    # o job só inicia depois da aprovação manual.
+    environment:
+      name: production
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Calcular versão (SemVer - MAJOR.MINOR do arquivo VERSION, PATCH = nº da execução)"
+        id: ver
+        run: echo "version=$(cat VERSION).${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Subir a imagem aprovada
+        run: docker run -d --name api -p 8000:8000 ${{ needs.build.outputs.image }}
+
+      - name: Smoke tests pós-deploy
+        run: sh scripts/smoke_test.sh http://localhost:8000
+
+      - name: Baseline - marcar imagem com a versão
+        run: |
+          IMG=${{ needs.build.outputs.image }}
+          NEW="${IMG%%:*}:${{ steps.ver.outputs.version }}"
+          docker tag "$IMG" "$NEW"
+          docker push "$NEW"
+
+      - name: Baseline - tag e release (notas automáticas)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
+          generate_release_notes: true

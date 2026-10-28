@@ -1,0 +1,7 @@
+services:
+  api:
+    build: .
+    image: ghcr.io/otavioroecker/imc-calculadora:local
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

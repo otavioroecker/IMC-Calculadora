@@ -1,0 +1,61 @@
+name: CI
+
+# Toda mudança entra na main via Pull Request. Este pipeline é o "quality gate":
+# o check "Qualidade e testes" é exigido pela proteção da branch main.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: Qualidade e testes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12 (com cache do pip)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements-dev.txt
+
+      - name: Formatação (black)
+        run: black --check .
+
+      - name: Lint (flake8)
+        run: flake8
+
+      - name: Testes + cobertura mínima de 80%
+        run: pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80
+
+      - name: Segurança do código (bandit)
+        run: bandit -r app -c pyproject.toml
+
+      - name: Vulnerabilidades em dependências (pip-audit)
+        run: pip-audit -r requirements.txt
+
+  imagem:
+    name: Build da imagem Docker
+    needs: qualidade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imagem (sem publicar)
+        run: docker build -t imc-calculadora:pr .
+      - name: Smoke test da imagem
+        run: |
+          docker run -d --name api -p 8000:8000 imc-calculadora:pr
+          sh scripts/smoke_test.sh http://localhost:8000

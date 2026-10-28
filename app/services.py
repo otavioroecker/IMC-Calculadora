@@ -10,9 +10,7 @@ class ImcService:
             raise ValueError("A altura deve ser maior que zero.")
 
         if request.altura > 3:
-            raise ValueError(
-                "Altura deve ser informada em metros (ex.: 1.90), não em centímetros."
-            )
+            raise ValueError("Altura deve ser informada em metros (ex.: 1.90), não em centímetros.")
 
         imc = request.peso / (request.altura**2)
 
