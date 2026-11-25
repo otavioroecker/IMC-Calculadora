@@ -46,3 +46,13 @@ def test_calcular_altura_em_centimetros_deve_lancar_excecao():
     # Erro comum: usuário digita 190 (cm) em vez de 1.90 (m)
     with pytest.raises(ValueError):
         service.calcular(ImcRequest(peso=100, altura=190))
+
+
+def test_calcular_peso_acima_do_maximo_deve_lancar_excecao():
+    with pytest.raises(ValueError, match="500"):
+        service.calcular(ImcRequest(peso=501, altura=1.70))
+
+
+def test_calcular_peso_no_limite_maximo_deve_funcionar():
+    resultado = service.calcular(ImcRequest(peso=500, altura=1.70))
+    assert resultado.imc == pytest.approx(173.01, abs=0.01)
