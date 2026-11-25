@@ -6,6 +6,9 @@ class ImcService:
         if request.peso <= 0:
             raise ValueError("O peso deve ser maior que zero.")
 
+        if request.peso > 500:
+            raise ValueError("O peso deve ser de no máximo 500 kg.")
+
         if request.altura <= 0:
             raise ValueError("A altura deve ser maior que zero.")
 
